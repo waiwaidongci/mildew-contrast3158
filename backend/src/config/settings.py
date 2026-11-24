@@ -7,3 +7,4 @@ JWT_SECRET = os.environ['JWT_SECRET']
 ARTIFACTS = Path(os.environ.get('ARTIFACT_DIR', '/artifacts'))
 SEED_DEMO = os.environ.get('SEED_DEMO', 'true').lower() == 'true'
 QUEUE = 'analysis-wakeup'
+HEARTBEAT = Path(os.environ.get('HEARTBEAT_FILE', '/tmp/analysis-heartbeat'))

@@ -1,12 +1,12 @@
 import logging
 import time
-from pathlib import Path
+from src.config.settings import HEARTBEAT
 from src.services.execution import claim, execute, materialize_due
 from src.utils.wakeup import wait
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
-heartbeat = Path('/tmp/analysis-heartbeat')
+heartbeat = HEARTBEAT
 
 
 def main():

@@ -10,8 +10,8 @@ export function handler(control, feedback, task) {
   };
 }
 
-export async function poll(task, isDone, active) {
-  for (let count = 0; count < 45 && active(); count += 1) {
+export async function poll(task, isDone, active, rounds = 45) {
+  for (let count = 0; count < rounds && active(); count += 1) {
     const item = await task();
     if (isDone(item)) return item;
     await new Promise(resolve => setTimeout(resolve, 650));

@@ -52,8 +52,17 @@ def parse_rows(text):
     rows = []
     try:
         headers = reader.fieldnames or []
-        if not required <= set(headers) or not set(headers) <= keys or len(headers) != len(set(headers)):
+        if not required <= set(headers) or len(headers) != len(set(headers)):
             raise ValueError('CSV 表头与字段说明不符，请下载模板检查列名')
+        extras = [header for header in headers if header not in keys]
+        limit = SPEC['extra_fields']['max']
+        name_limit = SPEC['extra_fields']['name_max']
+        if len(extras) > limit:
+            raise ValueError(f'是非项列最多 {limit} 列，请删减后重新导入')
+        for header in extras:
+            if not header or header != header.strip() or len(header) > name_limit:
+                raise ValueError(f'是非项列名「{header}」须为 1 至 {name_limit} 个字符且首尾无空格')
+        fields = fields + [{'key': header, 'label': header, 'type': 'bool'} for header in extras]
         for raw in reader:
             if len(rows) >= 5000:
                 raise ValueError('一个数据批次最多导入 5000 行')

@@ -2,8 +2,9 @@ import logging
 from datetime import date, timedelta
 from sqlalchemy import and_, or_, select
 from src.config.database import Session
+from src.config.settings import HEARTBEAT
 from src.constants.enums import Status
-from src.domain.analysis import analyze
+from src.domain.analysis import SearchAborted, analyze
 from src.domain.spec import SPEC
 from src.models.jobs import Delivery, Run, Schedule
 from src.models.source import Dataset
@@ -51,6 +52,7 @@ def claim():
         if job.attempt >= 3:
             job.status = Status.FAILED
             job.error = '后台进程多次中断，请发起新的运行'
+            job.progress = None
             job.finished_at = stamp
             record(db, 'worker', 'analysis.failed', job.id, reason=job.error)
             return None
@@ -58,15 +60,32 @@ def claim():
         job.attempt += 1
         job.lease_until = stamp + timedelta(minutes=3)
         records = db.get(Dataset, job.dataset_id).rows
-        return job.id, job.attempt, records, job.params
+        return job.id, job.attempt, records, job.params, job.progress
 
 
 def execute(lease):
-    job_id, attempt, rows, params = lease
+    job_id, attempt, rows, params, progress = lease
     result = export = failure = None
+
+    def checkpoint(state):
+        # 只有持有当前租约的尝试才能写入断点，并发重试的其余写入一律作废
+        try:
+            HEARTBEAT.touch()
+        except OSError:
+            pass
+        with Session.begin() as db:
+            job = db.get(Run, job_id, with_for_update=True)
+            if job is None or job.attempt != attempt or job.status != Status.RUNNING:
+                return False
+            job.progress = state
+            job.lease_until = now() + timedelta(minutes=3)
+            return True
+
     try:
-        result = analyze(rows, params)
+        result = analyze(rows, params, checkpoint=checkpoint, resume=progress)
         export = write_report(job_id, attempt, result)
+    except SearchAborted:
+        return
     except ValueError as error:
         failure = str(error)[:500]
     except Exception:
@@ -80,6 +99,7 @@ def execute(lease):
         job.finished_at = now()
         job.status = Status.FAILED if failure else Status.COMPLETE
         job.result = None if failure else result
+        job.progress = None
         job.export_file = export
         job.error = failure
         record(db, 'worker', f'analysis.{job.status}', job.id, attempt=attempt, reason=failure)

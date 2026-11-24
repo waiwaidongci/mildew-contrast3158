@@ -18,8 +18,8 @@ export async function results(route, refresh) {
   const finished = item => item.status === 'complete' || item.status === 'failed';
   if (!finished(job)) {
     const original = location.hash;
-    const status = el('p',{role:'status'},'后台正在计算，完成后会自动展示。');
-    poll(()=>workspace.getRun(id),finished,()=>location.hash===original)
+    const status = el('p',{role:'status'},'后台正在计算，算齐后自动展示榜单和两组命中单号。');
+    poll(()=>workspace.getRun(id),finished,()=>location.hash===original,240)
       .then(result=>{if (result && status.isConnected && location.hash===original) refresh();
         else if(status.isConnected) status.textContent='仍在执行，请点击刷新检查。';})
       .catch(error=>{if(status.isConnected) status.textContent=error.message;});
